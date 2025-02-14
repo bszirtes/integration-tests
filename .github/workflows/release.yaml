@@ -32,16 +32,50 @@ jobs:
     name: Create release
     uses: networkservicemesh/.github/.github/workflows/release.yaml@main
     secrets:
-      token: ${{ secrets.NSM_BOT_GITHUB_TOKEN }}
+      token: ${{ secrets.BOT_TOKEN }}
 
   release-dependent-repositories:
-    name: Release dependent repositories
-    needs: [get-tag, create-release]
-    uses: networkservicemesh/.github/.github/workflows/release-dependent-repositories.yaml@main
-    with:
-      tag: ${{ needs.get-tag.outputs.tag }}
-      dependent_repositories: |
-        ["integration-k8s-gke",
-         "integration-k8s-kind"]
-    secrets:
-      token: ${{ secrets.NSM_BOT_GITHUB_TOKEN }}
+    strategy:
+      matrix:
+        repository:
+          - integration-k8s-kind
+    name: Update ${{ matrix.repository }}
+    runs-on: ubuntu-latest
+    needs: get-tag
+    steps:
+      - name: Create commit
+        run: |
+          echo "Update go.mod and go.sum to ${{ github.repository }}@${{ needs.get-tag.outputs.tag }}" >> /tmp/commit-message
+      - name: Checkout bszirtes/${{ matrix.repository }}
+        uses: actions/checkout@v4
+        with:
+          path: bszirtes/${{ matrix.repository }}
+          repository: bszirtes/${{ matrix.repository }}
+          token: ${{ secrets.BOT_TOKEN }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.23.3
+      - name: Update ${{ matrix.repository }} locally
+        working-directory: bszirtes/${{ matrix.repository }}
+        continue-on-error: true
+        run: |
+          for dep in github.com/${{ github.repository }} \
+                     github.com/networkservicemesh/sdk-kernel \
+                     github.com/networkservicemesh/sdk-k8s \
+                     github.com/networkservicemesh/sdk-sriov \
+                     github.com/networkservicemesh/sdk-vpp \
+                     github.com/networkservicemesh/sdk-ovs; do
+            GOPRIVATE=github.com/networkservicemesh go get -u $dep@${{ needs.get-tag.outputs.tag }} || true
+          done
+          go mod tidy
+          git diff
+      - name: Push update to the ${{ matrix.repository }}
+        working-directory: bszirtes/${{ matrix.repository }}
+        run: |
+          echo Starting to update repositotry ${{ matrix.repository }}
+          git config --global user.email "nsmbot@networkservicmesh.io"
+          git config --global user.name "NSMBot"
+          git add go.mod go.sum
+          git commit -s -F /tmp/commit-message
+          git checkout -b ${{ github.event.workflow_run.head_branch }}
+          git push -f origin ${{ github.event.workflow_run.head_branch }}
