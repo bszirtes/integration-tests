@@ -47,7 +47,7 @@ jobs:
         run: |
           echo "Update go.mod and go.sum to ${{ github.repository }}@${{ needs.get-tag.outputs.tag }}" >> /tmp/commit-message
       - name: Checkout bszirtes/${{ matrix.repository }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: bszirtes/${{ matrix.repository }}
           repository: bszirtes/${{ matrix.repository }}
