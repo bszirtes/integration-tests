@@ -52,7 +52,7 @@ jobs:
           path: bszirtes/${{ matrix.repository }}
           repository: bszirtes/${{ matrix.repository }}
           token: ${{ secrets.BOT_TOKEN }}
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: 1.23.3
       - name: Update ${{ matrix.repository }} locally
